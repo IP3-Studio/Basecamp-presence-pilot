@@ -20,6 +20,10 @@ driver would use; the driver is the part this pilot leaves out, on purpose,
 because no desktop stack lets an app rotate the controller address in step
 with its payload without privileged or dedicated hardware.
 
+Read the article behind it, with the research it draws on and the nine
+assumptions this install exists to test:
+[docs/unlinkable-presence.md](docs/unlinkable-presence.md).
+
 ## What it does
 
 - **Headcount.** How many beacons are in the room this epoch, with no beacon
