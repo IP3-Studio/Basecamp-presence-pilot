@@ -1,0 +1,32 @@
+{
+  "name": "presence_ui",
+  "display_name": "Presence",
+  "version": "0.1.0",
+  "type": "ui_qml",
+  "interface": "universal",
+  "category": "privacy",
+  "description": "Unlinkable presence pilot: rotating presence beacons, friend recognition and a passive-observer view, simulated locally or carried over Logos Messaging",
+  "main": "presence_ui_plugin",
+  "icon": "icons/presence.png",
+  "view": "qml/Main.qml",
+  "dependencies": [],
+  "optional_dependencies": [
+    "delivery_module"
+  ],
+  "codegen": {
+    "rep": "src/presence_ui.rep"
+  },
+  "nix": {
+    "packages": {
+      "build": [],
+      "runtime": []
+    },
+    "external_libraries": [],
+    "cmake": {
+      "find_packages": [],
+      "extra_sources": [],
+      "extra_include_dirs": [],
+      "extra_link_libraries": []
+    }
+  }
+}

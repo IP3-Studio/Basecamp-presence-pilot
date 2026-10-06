@@ -1,0 +1,46 @@
+class PresenceUi
+{
+    // Radio and room
+    SLOT(void applyRadioMode(QString mode))
+    SLOT(void applyRoomCode(QString code))
+    SLOT(void applyEpochSeconds(int seconds))
+    SLOT(void applySimSpeed(int factor))
+    SLOT(void applySimPeers(int count))
+    SLOT(void applyAddressPolicy(QString policy))
+    SLOT(void applyAnonymityLevel(QString level))
+    SLOT(void connectNetwork())
+    SLOT(void disconnectNetwork())
+    SLOT(void clearObservations())
+
+    // Identity and contacts
+    SLOT(void createPairingCode())
+    SLOT(void addContact(QString name, QString code))
+    SLOT(void addSimulatedFriend())
+    SLOT(void removeContact(QString name))
+    SLOT(void newIdentity())
+
+    PROP(QString radioMode="sim" READONLY)
+    PROP(QString addressPolicy="aligned" READONLY)
+    PROP(QString anonymityLevel="Preferred" READONLY)
+    PROP(QString roomCode="lobby" READONLY)
+    PROP(int epochSeconds=900 READONLY)
+    PROP(int simSpeed=60 READONLY)
+    PROP(int simPeers=3 READONLY)
+    PROP(qlonglong epoch=0 READONLY)
+    PROP(int epochSecondsLeft=0 READONLY)
+    PROP(QString clockText="" READONLY)
+    PROP(int headcount=0 READONLY)
+    PROP(QString friendsJson="[]" READONLY)
+    PROP(QString contactsJson="[]" READONLY)
+    PROP(QString beaconJson="[]" READONLY)
+    PROP(QString observationsJson="[]" READONLY)
+    PROP(QString linkReportJson="{}" READONLY)
+    PROP(QString networkState="offline" READONLY)
+    PROP(QString networkInfo="" READONLY)
+    PROP(QString identityLabel="" READONLY)
+    PROP(QString status="" READONLY)
+    PROP(QString lastPairingCode="" READONLY)
+
+    SIGNAL(pairingCodeReady(QString code))
+    SIGNAL(notice(QString text))
+}
