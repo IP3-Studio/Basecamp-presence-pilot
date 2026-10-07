@@ -224,25 +224,130 @@ payload field.
 | Courier recipient tag | UTC day, HMAC(public static) | Observer who saw the announce can recompute tags |
 | Briar BTP tag | Per time period, at least 24 h | Computable by one contact only; strangers see no matchable value |
 
-## 4. The Logos transport, and its boundary
+## 4. The Logos mixnet, and how the pilot uses it
 
-Logos places metadata protection in the transport. The libp2p mixnet routes
-through relays that shuffle and delay, with cover traffic. Since
-logos-delivery-module v0.3.0 (30 September 2026) an application sets
-`messagingOverrides.anonymityLevel` to `None`, `Preferred` or `Required` when
-it creates its node; `Required` routes every send over a three-hop mix with
-per-hop RLN rate limiting, fails when no mix path exists, and needs a mix pool
-of at least four nodes plus an exit. The testnet chat is documented as
-sender-unlinkable over this path. Service discovery publishes a signed record of
-address and capabilities into a Kademlia DHT; that record is intentionally
-findable.
+### 4.1 The Mix Protocol
 
-The mixnet hides correspondent pairing from a network observer and leaves the
-emission of the local radio, or of the local IP hop, visible. Logos specifies no
-BLE advertisement format, no rotating proximity identifier, and no announce
-that withholds long-term keys. An application that inherits the mixnet still
-has a presence problem if it advertises a stable BLE payload. The two properties
-are independent.
+Source: Logos LIP "Mix Protocol" (lip.logos.co/anoncomms, status raw, protocol
+identifier `/mix/1.0.0`; modular rewrite 27 June 2025, SURB specification
+20 May 2026, LIONESS payload encryption 25 May 2026, last change 24 August
+2026); logos-co/logos-delivery-module releases v0.3.0 and v0.3.1; the
+docs.logos.co journey of 26 September 2026.
+
+The specification's own statement of purpose:
+
+> The Mix Protocol defines a decentralised anonymous message routing layer for
+> libp2p networks. It enables sender anonymity by routing each message through
+> a decentralised mix overlay network composed of participating libp2p nodes,
+> known as mix nodes. Each message is routed independently in a stateless
+> manner, allowing other libp2p protocols to selectively anonymise messages
+> without modifying their core protocol behaviour.
+
+Mechanism, as specified.
+
+- **Mix nodes and paths.** Any participating libp2p node can act as a mix node.
+  A sender samples a random path of distinct live mix nodes, three hops at
+  minimum, from the nodes it has discovered; path selection relies on unbiased
+  sampling from the set of live nodes.
+- **Sphinx packets.** Every message is wrapped in layered Sphinx encryption with
+  a fixed packet size of 4,608 bytes: a 32-byte ephemeral public value, 576 bytes
+  of encrypted routing information, a 16-byte MAC and a 3,984-byte encrypted
+  payload. Each hop peels one layer, learns only the previous and the next hop,
+  and cannot distinguish one packet from another by size or structure. Per-hop
+  integrity checks reject tagged or replayed packets, and a maximum path length
+  is enforced. Payloads larger than the fixed size are fragmented by the
+  application, which is not the case for this pilot.
+- **Delays and cover traffic.** Each mix node holds every incoming packet for a
+  random delay drawn from an exponential distribution whose mean the sender
+  chooses; packets therefore leave in an order unrelated to their arrival.
+  Nodes may emit loop cover traffic, dummy Sphinx packets that return to their
+  originator at random intervals, so that a node's sending pattern is masked.
+- **Exit.** The exit node decrypts the final layer, verifies the payload and the
+  exit abuse-prevention proof, and hands the message to a Mix Exit Layer, which
+  opens a client-only connection to the destination and forwards the message
+  through the origin protocol. The exit learns the plaintext and the
+  destination. It does not learn the sender.
+- **Replies.** Single-use reply blocks let a recipient answer without learning
+  the sender's identity or the return path. The pilot sends no replies.
+- **Abuse protection.** A deployment must carry a denial-of-service mechanism;
+  Rate-Limiting Nullifiers are the one Logos uses. Each message carries a
+  zero-knowledge proof that its sender is within a rate limit, which any node
+  can verify without learning who the sender is. The limit is a property of the
+  message rather than a decision taken at an entry gateway, which is where the
+  Loopix and Nym designs place it.
+
+Comparison with Tor, from the specification's section 3.1. Tor builds a
+persistent circuit and sends every cell of a session through it; the Mix
+Protocol routes each message independently and keeps no session state, so
+there is no circuit to correlate. Tor minimises latency for interactive
+traffic; the mix adds randomised delay at every hop in exchange for resistance
+to timing correlation. Because messages are delayed, reordered and unlinkable
+at each hop, the mix is less exposed to endpoint-level attacks such as traffic
+volume correlation and targeted probing. The price is latency, which rules the
+mix out for interactive use and makes it a fit for traffic that tolerates
+seconds of delay. A presence beacon sent once per epoch is such traffic.
+
+What the specification does not claim. Receiver anonymity is not addressed:
+the exit learns the destination. The exit learns the plaintext. Timing analysis
+is resisted rather than eliminated; the delay distributions are truncated in
+practice, so the anonymity set is bounded. No analysis of a global passive
+adversary is given. Endpoint and application security are out of scope.
+
+Deployment status, from the Logos releases. The mix runs on the live testnet.
+Testnet v0.2 (mid-2026) added cover traffic, hardened DoS and exit-abuse
+protection, chat over mix, and DHT queries carried through the mixnet so that
+discovery does not expose the querier. Rendezvous-style hidden services are
+scheduled for v0.3. Incentivised participation is at the design stage. The
+delivery module exposes the mix to applications through one setting,
+`messagingOverrides.anonymityLevel`, fixed when the node is created: `None`
+publishes directly and never mounts the mix; `Preferred` uses a mix path when
+one exists and otherwise sends directly; `Required` sends only through the mix
+and fails when no path exists. A `Required` send needs a pool of at least four
+mix nodes plus an exit, which takes one to two minutes to assemble after a node
+starts. Logos Messaging rides this layer, so the record of who published a
+message gets the protection; the Logos stack contains no BLE or off-grid radio
+of its own.
+
+### 4.2 What the pilot sends through it
+
+With the radio set to NETWORK, the pilot creates its delivery node at the
+configured anonymity level and, once per heartbeat (20 s) and at each epoch
+change, publishes one message on `/logos-presence/1/room-<code>/json`:
+
+```
+{"v":1, "e":E, "s":[anon_E, tag_{me,E} ..., pad ...]}     four 16-byte slots as hex
+```
+
+The message carries no identifier of the publisher: no peer ID, no key, no
+nickname, no `from` field. Under `Required` it leaves the device as a Sphinx
+packet, crosses at least three mix nodes with random delays, and is published
+by the exit onto the content topic. The relay and store nodes that hold the
+topic see the exit as the publisher. The payload is 4,608 bytes on every hop
+regardless of the beacon's size, so the number of slots is not visible in
+transit. The receiving pilot turns each message into four observations whose
+pseudo-address is the first six bytes of the payload's hash: one message is one
+device for the epoch, and the next epoch's message, whose payload differs in
+every byte, is unlinkable to it by construction. Store nodes keep the message
+for their retention window; what they keep is a set of per-epoch tokens that
+cannot be joined across epochs.
+
+The division of labour is the point of section 1. The mixnet unlinks the
+publishing node from the message on the network path: a network observer, a
+relay, or a store node cannot say which node published a beacon. The payload
+schedule makes one epoch's beacon unlinkable to the next. Neither mechanism
+touches the radio: a device publishing beacons through the mix while
+advertising a stable BLE payload is still followed in the room. And the two
+weaker settings weaken only the first half: under `Preferred` a send without a
+mix path goes directly and names the publishing node to the relay, and under
+`None` every send does. The pilot shows the level in force, and shows when
+another module created the node first and its level applies instead.
+
+What remains under `Required`. The exit sees the plaintext beacon, which by
+design contains nothing linkable. Timing at the exit is the residual: a beacon
+published at each epoch boundary has a regular cadence, and the pilot adds no
+jitter to it. A store node sees topic, size and arrival time of every message.
+None of these link one epoch's beacon to the next; they bound the anonymity
+set within an epoch.
 
 ## 5. Platform constraints on the address half
 
@@ -350,9 +455,11 @@ Each assumption is a claim the pilot relies on. The tag names its origin.
 - **A10 [Platform, section 5].** macOS yields epoch-limited linkability of about
   one address period; default BlueZ yields full linkability; an owned radio
   yields the strict property.
-- **A11 [Logos, section 4].** The mixnet unlinks publisher from message on the
-  network path and leaves radio presence untouched; the network twin's
-  unlinkability rests on the payload schedule alone.
+- **A11 [Logos, section 4].** Under `Required`, the mixnet unlinks the publishing
+  node from the message on the network path and leaves radio presence
+  untouched; the network twin's cross-epoch unlinkability rests on the payload
+  schedule alone, and its within-epoch anonymity set is bounded by timing at the
+  exit.
 - **A12 [NYM].** Retired identities must stop being usable after a bounded
   number of epochs. The pilot keeps no retired material (no store-and-forward on
   the radio path), so the bound is zero; the assumption becomes relevant the
@@ -372,7 +479,7 @@ install, the expected result, the result that falsifies it, and its status as of
 | O4 | A4, A5 | Two instances (two user directories), exchange a pairing code | each sees the other as present within one epoch; a third instance without the key sees four indistinguishable slots | recognition fails, or the third instance distinguishes the tag slot | simulated friend asserted in CI; two-instance run pending |
 | O5 | A6 | 0, 1, 2 and 3 contacts | exactly 4 distinct slots per trail per epoch in every case | any trail with a slot count that varies with contacts | pending |
 | O6 | A9 | N strangers, F simulated friends, each policy | headcount = N + F + 1 from the first epoch in which every device has advertised | over-count under drift, or under-count under any policy | native core test; UI run pending |
-| O7 | A11 | Two instances on logos.test, same room code, `Required` | both see network-sourced observations; verdict unlinkable; with no mix path the send fails and the panel says so; with `Preferred` it falls back | cross-epoch linkage of a publisher, or silent fallback under `Required` | not exercised; needs delivery_module installed and the mix pool up |
+| O7 | A11 | Two instances on logos.test, same room code, `Required` | both see network-sourced observations within one epoch; verdict unlinkable; with no mix path the send fails and the panel says so; with `Preferred` it falls back and says so | cross-epoch linkage of a publisher, silent fallback under `Required`, or a beacon arriving later than one epoch after its send | not exercised; needs delivery_module installed and a mix pool of four nodes plus an exit |
 | O8 | A8 | One simulated device skewed by up to one epoch | still recognised; no bridge introduced | recognition lost, or a bridge appears | the core carries a skew field; no UI control yet |
 | O9 | A10 | Sniffer (nRF52840 with the Nordic sniffer firmware) beside a Mac and a Linux box | macOS address period about 15 min, not steerable; BlueZ public address under defaults; owned radio aligns | any platform behaving otherwise | outside the pilot; not measured |
 
@@ -439,6 +546,7 @@ and verdict on the right. For O4 and O7 launch a second Basecamp with
 - CVE-2026-51376; audit note of 28 January 2026.
 - briarproject.org, news post of 9 July 2026; briar-spec, BRP.md and BTP.md.
 - Spl0itable/NYM, Ghost Mode.
+- Logos LIP, "Mix Protocol", lip.logos.co/anoncomms (raw; protocol `/mix/1.0.0`; last change 24 August 2026); Danezis and Goldberg, "Sphinx: A Compact and Provably Secure Mix Format", IEEE S&P 2009; Piotrowska et al., "The Loopix Anonymity System", USENIX Security 2017.
 - logos-co/logos-delivery-module releases v0.3.0 (30 September 2026) and v0.3.1 (5 October 2026); logos-co/logos-docs, journey "Use delivery and chat modules with libp2p-mix" (26 September 2026); docs.logos.co, "What is Logos", "About the Blend Network", "Logos Storage", retrieved 6 October 2026.
 - Álvarez et al., "A Location Privacy Analysis of Bluetooth Mesh", ARES 2019; JISA 54, 2020.
 - DP-3T/bt-measurements, linkability.md; ePrint 2020/1309.
