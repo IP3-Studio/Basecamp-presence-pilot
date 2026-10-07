@@ -272,9 +272,9 @@ Mechanism, as specified.
 - **Abuse protection.** A deployment must carry a denial-of-service mechanism;
   Rate-Limiting Nullifiers are the one Logos uses. Each message carries a
   zero-knowledge proof that its sender is within a rate limit, which any node
-  can verify without learning who the sender is. The limit is a property of the
-  message rather than a decision taken at an entry gateway, which is where the
-  Loopix and Nym designs place it.
+  can verify without learning who the sender is. The limit travels with the
+  message; the Loopix and Nym designs place the same decision at an entry
+  gateway.
 
 Comparison with Tor, from the specification's section 3.1. Tor builds a
 persistent circuit and sends every cell of a session through it; the Mix
@@ -289,8 +289,8 @@ seconds of delay. A presence beacon sent once per epoch is such traffic.
 
 What the specification does not claim. Receiver anonymity is not addressed:
 the exit learns the destination. The exit learns the plaintext. Timing analysis
-is resisted rather than eliminated; the delay distributions are truncated in
-practice, so the anonymity set is bounded. No analysis of a global passive
+is resisted, and the delay distributions are truncated in practice, so the
+anonymity set is bounded. No analysis of a global passive
 adversary is given. Endpoint and application security are out of scope.
 
 Deployment status, from the Logos releases. The mix runs on the live testnet.
