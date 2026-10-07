@@ -20,9 +20,11 @@ driver would use; the driver is the part this pilot leaves out, on purpose,
 because no desktop stack lets an app rotate the controller address in step
 with its payload without privileged or dedicated hardware.
 
-Read the article behind it, with the research it draws on and the nine
-assumptions this install exists to test:
-[docs/unlinkable-presence.md](docs/unlinkable-presence.md).
+The study behind it, written for researchers, is in
+[docs/unlinkable-presence.md](docs/unlinkable-presence.md): definitions, the
+BitChat and Briar facts and the assumptions each implies, what this pilot
+simulates, twelve numbered assumptions, nine outcomes with pass and fail
+criteria, and eleven outstanding gaps.
 
 ## What it does
 
