@@ -1,4 +1,4 @@
-# Unlinkable presence on BLE mesh: the study, and what the Basecamp pilot simulates
+# Unlinkable Presence on BLE mesh: Basecamp Pilot
 
 > **Disclaimer.** This is personal, experimental research. It is not an official
 > Logos publication and not an audited result. The pilot it describes is a hobby
@@ -7,10 +7,7 @@
 > Briar, NYM, Logos, Basecamp). Facts about third-party software were read from
 > their public repositories on the dates given and may have changed since.
 
-*7 October 2026. This article presents the technical note "Unlinkable presence on
-BLE mesh" (6 October 2026) and the Presence pilot in this repository, which
-simulates the property the note finds missing. It is written for someone who
-wants to reproduce the reading, challenge the assumptions, or extend the pilot.*
+October 2026. This article presents the technical note "Unlinkable presence on BLE mesh" (6 October 2026) and explores a presence pilot in this repository, which simulates the property of a radio network. The pilot is for research and simulation purposes only, and the setup can be freely used by anyone interested in running, challenging assumptions, or expanding on the pilot.
 
 ## 1. Scope and definitions
 
@@ -77,12 +74,11 @@ Facts.
   the consequence: a passive receiver can enumerate participants and follow a
   device between places; unlinkable presence is not a current property. Origin
   packets leave at the default TTL, so hop distance identifies the originator.
-- **F-B5. What does not rotate the peer ID.** The platform advertising
-  identifier is not an input (no advertising SDK), so resetting it changes
-  nothing. Controller address randomisation does not either: the payload still
-  carries the stable ID and keys. A reboot does not. Aeroplane mode or RF
-  shielding stops transmission and does not rotate the identity used on the next
-  transmission.
+- **F-B5. Controls that leave the peer ID unchanged.** The platform advertising
+  identifier is not an input (the app has no advertising SDK), so resetting it
+  changes nothing. Controller address randomisation leaves the stable ID and keys
+  in the payload. A reboot keeps the keychain. Aeroplane mode or RF shielding
+  stops transmission, and the next transmission uses the same identity.
 - **F-B6. Sealed mail.** Live Noise sessions have forward secrecy. Courier
   envelopes do not: a courier tag is a 16-byte HMAC of the recipient's static
   public key and the UTC day, computable by any party that knows that key, and
@@ -132,8 +128,8 @@ Assumptions BitChat makes, as read from the above.
   pairwise tag, and the two changes have to ship together with the ID rotation.
   (F-B7.)
 - **AB5.** A tag derived from a public value is acceptable for courier routing.
-  (F-B6.) The draft's private-key derivation for the peer ID is the correction of
-  this assumption for presence; the courier tag is not yet corrected.
+  (F-B6.) The draft abandons this assumption for the peer ID by deriving from the
+  private key. The courier tag keeps the public-key derivation.
 
 ### 2.2 Briar
 
@@ -162,13 +158,13 @@ Assumptions Briar makes.
 - **AR1.** Presence is only ever disclosed to a specific contact, through a value
   only that contact can compute. (F-R2, F-R3.)
 - **AR2.** A rotation period of a day is short enough for the transport keys, so
-  tags are stable within a day. (F-R2.) This is a forward-secrecy choice, not an
-  unlinkability choice: within the period the tag links the device for anyone who
+  tags are stable within a day. (F-R2.) The period is chosen for forward
+  secrecy. Within the period the tag links the device for anyone who
   can compute it, which by AR1 is one contact.
 - **AR3.** Giving up stranger discovery is an acceptable price. (F-R1.)
 - **AR4.** The platform's address randomisation is taken as given, as in AB3,
-  with the difference that no Briar payload is matchable by a stranger in the
-  first place, so misalignment reveals only that some Briar device is present.
+  with the difference that no Briar payload is matchable by a stranger, so
+  misalignment reveals only that some Briar device is present.
 
 ### 2.3 Other systems, in brief
 
@@ -182,8 +178,8 @@ Assumptions Briar makes.
   node, and the wire format is unchanged.
 - **SimpleX and Cwtch** remove account identifiers on an IP or Tor path and
   define no BLE presence identifier.
-- **GAEN and Find My** rotate BLE identifiers in production; both are proximity
-  beacons, not multi-hop meshes.
+- **GAEN and Find My** rotate BLE identifiers in production; both are single-hop
+  proximity beacons.
 
 ## 3. Prior results
 
@@ -191,7 +187,7 @@ Assumptions Briar makes.
   advertising address of a Bluetooth Mesh installation is sufficient for a phone
   app to localise a handset indoors, and that address randomisation on the mesh
   nodes stopped the positioning without affecting mesh operation. The identifier
-  in that attack is the controller address, not an application peer ID.
+  in that attack is the controller address alone.
 - DP-3T, GAEN and TCN broadcast epoch-limited pseudonyms (EphID, RPI, CEN) and
   keep observed identifiers on the device. Linkability across a rotation requires
   the pseudonym epoch and the resolvable private address epoch to overlap. CEN
@@ -235,19 +231,18 @@ through relays that shuffle and delay, with cover traffic. Since
 logos-delivery-module v0.3.0 (30 September 2026) an application sets
 `messagingOverrides.anonymityLevel` to `None`, `Preferred` or `Required` when
 it creates its node; `Required` routes every send over a three-hop mix with
-per-hop RLN rate limiting and fails rather than falling back, and needs a mix
-pool of at least four nodes plus an exit. The testnet chat is documented as
+per-hop RLN rate limiting, fails when no mix path exists, and needs a mix pool
+of at least four nodes plus an exit. The testnet chat is documented as
 sender-unlinkable over this path. Service discovery publishes a signed record of
 address and capabilities into a Kademlia DHT; that record is intentionally
 findable.
 
-The boundary is exact. The mixnet hides correspondent pairing from a network
-observer. It does not hide the fact that a local radio, or the local IP hop, is
-emitting. Logos does not specify a BLE advertisement format, a rotating
-proximity identifier, or an announce that withholds long-term keys. An
-application that inherits the mixnet still has a presence problem if it
-advertises a stable BLE payload. Network unlinkability and radio presence are
-independent properties with independent fixes.
+The mixnet hides correspondent pairing from a network observer and leaves the
+emission of the local radio, or of the local IP hop, visible. Logos specifies no
+BLE advertisement format, no rotating proximity identifier, and no announce
+that withholds long-term keys. An application that inherits the mixnet still
+has a presence problem if it advertises a stable BLE payload. The two properties
+are independent.
 
 ## 5. Platform constraints on the address half
 
@@ -289,9 +284,9 @@ beacon_E      = [anon_E, tag_{me,E} per contact ..., pad ...]  (exactly 4 slots)
 
 `role_X` is 0 for the side that created the pairing code and 1 for the side that
 pasted it, so the two sides emit different tags and each can compute the other's.
-Receivers accept E-1, E and E+1. Padding is derived rather than random so that
-it repeats within the epoch like a real slot; the slot count is fixed so that it
-does not vary with the number of contacts. The schedule follows F-B7 in deriving
+Receivers accept E-1, E and E+1. Padding is derived from the seed so that it
+repeats within the epoch as a real slot does, and the slot count is fixed so
+that it carries no information about the number of contacts. The schedule follows F-B7 in deriving
 from secret material and AR1 in deriving recognition from a pairwise secret. The
 pairing secret is symmetric and trust-on-first-use; public-key pairing is not in
 this build.
@@ -357,7 +352,7 @@ Each assumption is a claim the pilot relies on. The tag names its origin.
   yields the strict property.
 - **A11 [Logos, section 4].** The mixnet unlinks publisher from message on the
   network path and leaves radio presence untouched; the network twin's
-  unlinkability therefore rests on the payload schedule, not on the mixnet.
+  unlinkability rests on the payload schedule alone.
 - **A12 [NYM].** Retired identities must stop being usable after a bounded
   number of epochs. The pilot keeps no retired material (no store-and-forward on
   the radio path), so the bound is zero; the assumption becomes relevant the
@@ -381,14 +376,14 @@ install, the expected result, the result that falsifies it, and its status as of
 | O8 | A8 | One simulated device skewed by up to one epoch | still recognised; no bridge introduced | recognition lost, or a bridge appears | the core carries a skew field; no UI control yet |
 | O9 | A10 | Sniffer (nRF52840 with the Nordic sniffer firmware) beside a Mac and a Linux box | macOS address period about 15 min, not steerable; BlueZ public address under defaults; owned radio aligns | any platform behaving otherwise | outside the pilot; not measured |
 
-Outcomes O1 to O6 run on a single Basecamp with the simulated radio. O7 needs
-two Basecamps and the testnet. O8 needs a one-line addition. O9 needs hardware.
+Outcomes O1 to O6 run on one Basecamp with the simulated radio; O7 needs two
+Basecamps and the testnet, O8 a one-line addition, and O9 a sniffer.
 
 ## 9. Outstanding gaps in the pilot
 
 - **G1. No radio.** The pilot proves the schedule and the observer argument and
   does not show that any Bluetooth stack rotates its address in step with a
-  payload. The address policies are models of platforms, not measurements of
+  payload. The address policies model the platforms; nothing here measures
   them.
 - **G2. No address control.** Even with a real driver, A2 cannot be met on macOS
   or on default BlueZ (section 5). The strict configuration needs an owned
