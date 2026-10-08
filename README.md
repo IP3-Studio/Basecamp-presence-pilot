@@ -105,7 +105,11 @@ Runtime:
 `delivery_module` is optional on purpose: Basecamp loads Presence without it,
 and the simulated room, the observer view and pairing all work offline. For
 the network twin, install `delivery_module` from **Modules** (official Logos
-repository, about 96 MB) and load it. The anonymity level is fixed when the
+repository, about 96 MB) and load it. Two presets are offered. `logos.test`
+rate-limits every send with an RLN proof, which needs a funded membership on
+the LEZ testnet (no faucet; see the Logos journey "Run a delivery node with
+RLN"); without one every send fails after its retry window. `logos.dev` has
+no rate-limit gate and is where the network twin was first exercised. The anonymity level is fixed when the
 delivery node is created, so if another app (Chat) created the node first its
 level applies and the UI says so.
 

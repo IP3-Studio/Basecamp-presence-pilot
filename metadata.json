@@ -1,7 +1,7 @@
 {
   "name": "presence_ui",
   "display_name": "Presence",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "ui_qml",
   "interface": "universal",
   "category": "privacy",

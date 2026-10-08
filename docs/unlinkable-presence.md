@@ -479,7 +479,7 @@ install, the expected result, the result that falsifies it, and its status as of
 | O4 | A4, A5 | Two instances (two user directories), exchange a pairing code | each sees the other as present within one epoch; a third instance without the key sees four indistinguishable slots | recognition fails, or the third instance distinguishes the tag slot | simulated friend asserted in CI; two-instance run pending |
 | O5 | A6 | 0, 1, 2 and 3 contacts | exactly 4 distinct slots per trail per epoch in every case | any trail with a slot count that varies with contacts | pending |
 | O6 | A9 | N strangers, F simulated friends, each policy | headcount = N + F + 1 from the first epoch in which every device has advertised | over-count under drift, or under-count under any policy | native core test; UI run pending |
-| O7 | A11 | Two instances on logos.test, same room code, `Required` | both see network-sourced observations within one epoch; verdict unlinkable; with no mix path the send fails and the panel says so; with `Preferred` it falls back and says so | cross-epoch linkage of a publisher, silent fallback under `Required`, or a beacon arriving later than one epoch after its send | not exercised; needs delivery_module installed and a mix pool of four nodes plus an exit |
+| O7 | A11 | Two instances on logos.test, same room code, `Required` | both see network-sourced observations within one epoch; verdict unlinkable; with no mix path the send fails and the panel says so; with `Preferred` it falls back and says so | cross-epoch linkage of a publisher, silent fallback under `Required`, or a beacon arriving later than one epoch after its send | partly exercised on 8 October 2026, one instance, `logos.dev`, `Preferred`: 13 beacons sent, 7 propagated through a three-hop mix path, 4 failed in the retry window, the plain fallback found no peers on the shard; the relay returned the beacon to the sending node. Recognition between two instances and the `Required` fail-closed case remain |
 | O8 | A8 | One simulated device skewed by up to one epoch | still recognised; no bridge introduced | recognition lost, or a bridge appears | the core carries a skew field; no UI control yet |
 | O9 | A10 | Sniffer (nRF52840 with the Nordic sniffer firmware) beside a Mac and a Linux box | macOS address period about 15 min, not steerable; BlueZ public address under defaults; owned radio aligns | any platform behaving otherwise | outside the pilot; not measured |
 
@@ -504,10 +504,14 @@ Basecamps and the testnet, O8 a one-line addition, and O9 a sniffer.
 - **G5. Shape and timing.** Slot count and length are fixed, but the simulated
   inter-advertisement interval is a model. The residual fingerprint of a real
   stack's timing (Alghamdi 2026) is untested.
-- **G6. Network twin unexercised.** O7 has not run against the testnet. The
-  delivery glue follows a module known to work on the same stack, and the
-  anonymity key follows the published journey, but nothing here has been seen on
-  the wire.
+- **G6. Network twin only partly exercised.** On `logos.dev` with `Preferred`,
+  7 of 13 beacons went through the mix and the rest timed out, with the plain
+  path reporting no peers on the shard. Two-instance recognition over the
+  network and the `Required` fail-closed case have not been run. On
+  `logos.test` every send is held for an RLN proof, and a node without a
+  funded membership (250,000,000 native LEZ units on the testnet, no faucet)
+  never sends; the registry module also has to reach the LEZ sequencer, which
+  this machine could not.
 - **G7. No skew control.** O8 cannot be run from the interface.
 - **G8. No export.** The observation log and the linkability report are shown on
   screen and not written to a file, so offline analysis of a long run, or
@@ -520,7 +524,12 @@ Basecamps and the testnet, O8 a one-line addition, and O9 a sniffer.
   command-line installer drops the optional-dependency key from the installed
   manifest, so the host will not load `delivery_module` on the pilot's behalf.
   Basecamp carries no Bluetooth usage string, which blocks any future
-  CoreBluetooth driver inside the shell until the host adds one.
+  CoreBluetooth driver inside the shell until the host adds one. Whichever
+  module creates the delivery node first fixes its preset and anonymity level
+  for every other module in the session, so the pilot's own settings apply
+  only when it is first; and delivery 0.3.x rejects a node configuration that
+  carries any unknown key (the 0.1.0 package sent `logLevel` and so could never
+  create a node itself; fixed in 0.1.1).
 - **G11. Retired material.** A12 is vacuous in this build because nothing is
   stored for late delivery. Any store-and-forward extension has to bound the
   decryptability window explicitly.

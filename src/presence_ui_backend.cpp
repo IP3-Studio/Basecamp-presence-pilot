@@ -28,7 +28,7 @@ const QString kSettingsOrg = QStringLiteral("Logos");
 const QString kSettingsApp = QStringLiteral("presence_ui");
 const int kObservationCap = 8000;
 const int kObservationRows = 40;
-const int kHeartbeatMs = 20000;
+const int kHeartbeatMs = 60000;  // one per minute: inside an RLN epoch quota on logos.test
 const int kPeersMax = 12;
 
 QString slotHex(const Slot16& s) { return QString::fromStdString(presence::hex(s.data(), s.size())); }
@@ -325,6 +325,20 @@ void PresenceUiBackend::applyAnonymityLevel(QString level)
     updateStatus();
 }
 
+void PresenceUiBackend::applyPreset(QString preset)
+{
+    const QString p = preset.trimmed();
+    if (p != QLatin1String("logos.test") && p != QLatin1String("logos.dev"))
+        return;
+    if (p == this->preset())
+        return;
+    setPreset(p);
+    QSettings(kSettingsOrg, kSettingsApp).setValue(QStringLiteral("preset"), p);
+    if (m_deliveryReady)
+        say(QStringLiteral("The network preset is fixed when the node is created. Restart Basecamp for it to apply."));
+    updateStatus();
+}
+
 void PresenceUiBackend::clearObservations()
 {
     resetLog(QString());
@@ -545,6 +559,8 @@ void PresenceUiBackend::loadSettings()
     setRoomCode(cleanRoom(s.value(QStringLiteral("roomCode"), QStringLiteral("lobby")).toString()));
     const QString lvl = s.value(QStringLiteral("anonymityLevel"), QStringLiteral("Preferred")).toString();
     setAnonymityLevel(lvl == QLatin1String("None") || lvl == QLatin1String("Required") ? lvl : QStringLiteral("Preferred"));
+    const QString pre = s.value(QStringLiteral("preset"), QStringLiteral("logos.test")).toString();
+    setPreset(pre == QLatin1String("logos.dev") ? pre : QStringLiteral("logos.test"));
     // The radio always starts simulated: joining the testnet is a click, not a default.
     setRadioMode(QStringLiteral("sim"));
 }
@@ -610,9 +626,11 @@ void PresenceUiBackend::ensureDelivery(std::function<void(bool, QString)> done)
     // createNode rejects duplicates and start is not idempotent: another
     // consumer (the Chat app) may already own the node, with its own anonymity
     // level. Both results are tolerated; subscribe is the call that must work.
+    // No logLevel key: delivery 0.3.x rejects unknown options outright
+    // ("Unrecognized configuration option(s) found: logLevel").
     const QString cfg = QStringLiteral(
-        "{\"mode\":\"Core\",\"preset\":\"logos.test\",\"logLevel\":\"ERROR\","
-        "\"messagingOverrides\":{\"anonymityLevel\":\"%1\"}}").arg(anonymityLevel());
+        "{\"mode\":\"Core\",\"preset\":\"%1\","
+        "\"messagingOverrides\":{\"anonymityLevel\":\"%2\"}}").arg(preset(), anonymityLevel());
     modules().delivery_module.createNodeAsync(cfg, [this, done](LogosResult created) {
         m_nodeOwnedElsewhere = !created.success;
         modules().delivery_module.startAsync([this, done](LogosResult) {
@@ -630,7 +648,7 @@ void PresenceUiBackend::connectNetwork()
         setRadioMode(radioMode() == QLatin1String("sim") ? QStringLiteral("both") : QStringLiteral("network"));
         QSettings(kSettingsOrg, kSettingsApp).setValue(QStringLiteral("radioMode"), radioMode());
     }
-    setNet(QStringLiteral("starting"), QStringLiteral("Starting the delivery node on logos.test..."));
+    setNet(QStringLiteral("starting"), QStringLiteral("Starting the delivery node on %1...").arg(preset()));
     const int gen = ++m_netGen;
     ensureDelivery([this, gen](bool ok, QString detail) {
         if (gen != m_netGen)
@@ -919,8 +937,8 @@ void PresenceUiBackend::updateStatus()
                      .arg(int(std::count_if(m_contacts.begin(), m_contacts.end(), [](const StoredContact& s) { return s.sim; })))
                      .arg(addressPolicy());
     if (networkWanted())
-        parts << QStringLiteral("Network room \"%1\" on logos.test, anonymity %2: %3.")
-                     .arg(roomCode(), anonymityLevel(), networkState());
+        parts << QStringLiteral("Network room \"%1\" on %2, anonymity %3: %4.")
+                     .arg(roomCode(), preset(), anonymityLevel(), networkState());
     setStatus(parts.join(QLatin1Char(' ')));
 }
 

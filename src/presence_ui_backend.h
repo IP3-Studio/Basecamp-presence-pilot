@@ -36,6 +36,7 @@ public:
     void applySimPeers(int count) override;
     void applyAddressPolicy(QString policy) override;
     void applyAnonymityLevel(QString level) override;
+    void applyPreset(QString preset) override;
     void connectNetwork() override;
     void disconnectNetwork() override;
     void clearObservations() override;

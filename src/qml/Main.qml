@@ -16,6 +16,7 @@ Item {
     readonly property string radioMode: ready && backend && backend.radioMode ? backend.radioMode : "sim"
     readonly property string addressPolicy: ready && backend && backend.addressPolicy ? backend.addressPolicy : "aligned"
     readonly property string anonymityLevel: ready && backend && backend.anonymityLevel ? backend.anonymityLevel : "Preferred"
+    readonly property string preset: ready && backend && backend.preset ? backend.preset : "logos.test"
     readonly property string roomCode: ready && backend && backend.roomCode ? backend.roomCode : "lobby"
     readonly property int epochSeconds: ready && backend && backend.epochSeconds !== undefined ? backend.epochSeconds : 900
     readonly property int simSpeed: ready && backend && backend.simSpeed !== undefined ? backend.simSpeed : 60
@@ -340,6 +341,14 @@ Item {
                             DarkField { id: roomField; Layout.fillWidth: true; placeholderText: "room code"; text: root.roomCode }
                             DarkButton { text: "Set"; onClicked: if (root.backend) root.backend.applyRoomCode(roomField.text) }
                         }
+                        Text { text: "Network preset (fixed when the node starts)"; font.pixelSize: 11; color: root.cText }
+                        Seg {
+                            model: [{ label: "LOGOS.TEST", value: "logos.test" }, { label: "LOGOS.DEV", value: "logos.dev" }]
+                            current: root.preset
+                            onPicked: function(v) { if (root.backend) root.backend.applyPreset(v) }
+                        }
+                        Text { Layout.fillWidth: true; wrapMode: Text.WordWrap; font.pixelSize: 10; color: root.cMuted
+                               text: "logos.test needs a funded RLN membership to send; logos.dev has no rate-limit gate. Whichever app creates the node first fixes its preset." }
                         Text { text: "Anonymity level (fixed when the node starts)"; font.pixelSize: 11; color: root.cText }
                         Seg {
                             model: [{ label: "NONE", value: "None" }, { label: "PREFERRED", value: "Preferred" }, { label: "REQUIRED", value: "Required" }]
@@ -559,7 +568,7 @@ Item {
         RowLayout {
             Layout.fillWidth: true
             Text { text: root.noticeText; font.pixelSize: 11; color: root.cAccent; Layout.fillWidth: true; elide: Text.ElideRight }
-            Text { text: "0.1.0 · simulated radio · not audited"; font.pixelSize: 10; color: root.cMuted }
+            Text { text: "0.1.1 · simulated radio · not audited"; font.pixelSize: 10; color: root.cMuted }
         }
     }
 
