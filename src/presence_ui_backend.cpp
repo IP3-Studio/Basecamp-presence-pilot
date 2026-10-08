@@ -15,6 +15,7 @@
 #include <QStandardPaths>
 
 #include <algorithm>
+#include <map>
 #include <cstring>
 
 using presence::Contact;
@@ -174,36 +175,52 @@ void PresenceUiBackend::refreshUi()
 
 void PresenceUiBackend::rebuildRoom()
 {
+    // Devices persist across rebuilds. A rebuild only adds, removes or
+    // re-parameterises; a stranger keeps its seed, address and cadence, so the
+    // observer log stays consistent with the room (a fresh seed mid-epoch would
+    // leave orphaned trails behind and inflate the headcount).
+    std::map<std::string, presence::SimDevice> keep;
+    for (const presence::SimDevice& d : m_room.devices)
+        keep.emplace(d.name, d);
+    auto take = [&](const std::string& name) {
+        auto it = keep.find(name);
+        if (it != keep.end())
+            return it->second;
+        return presence::makeSimDevice(name);
+    };
+
     m_room.devices.clear();
     m_room.epochSeconds = epochSeconds();
     presence::AddressPolicy p = presence::AddressPolicy::Aligned;
     presence::addressPolicyFromName(addressPolicy().toStdString(), p);
     m_room.policy = p;
-
     const int speed = qMax(1, simSpeed());
 
     // The user's own beacon is part of the room: a sniffer logs it too.
-    presence::SimDevice me = presence::makeSimDevice("You");
+    presence::SimDevice me = take("You");
     me.seed = m_seed;
     me.contacts = plainContacts();
-    me.advIntervalMs *= speed;
+    me.slotsEpoch = -1;  // contacts changed: recompute slots
+    me.advIntervalMs = me.advBaseMs * speed;
     m_room.devices.push_back(me);
 
     // Simulated friends carry the mirror of the pairing (the other role).
     for (const StoredContact& sc : m_contacts) {
         if (!sc.sim)
             continue;
-        presence::SimDevice d = presence::makeSimDevice(sc.c.name);
+        presence::SimDevice d = take(sc.c.name);
         Contact mirror = sc.c;
         mirror.myRole = 1 - sc.c.myRole;
         d.contacts = {mirror};
-        d.advIntervalMs *= speed;
+        d.slotsEpoch = -1;
+        d.advIntervalMs = d.advBaseMs * speed;
         m_room.devices.push_back(d);
     }
 
     for (int i = 0; i < simPeers(); ++i) {
-        presence::SimDevice d = presence::makeSimDevice("Stranger " + std::to_string(i + 1));
-        d.advIntervalMs *= speed;
+        presence::SimDevice d = take("Stranger " + std::to_string(i + 1));
+        d.contacts.clear();
+        d.advIntervalMs = d.advBaseMs * speed;
         m_room.devices.push_back(d);
     }
 }

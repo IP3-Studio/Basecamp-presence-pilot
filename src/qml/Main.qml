@@ -568,7 +568,7 @@ Item {
         RowLayout {
             Layout.fillWidth: true
             Text { text: root.noticeText; font.pixelSize: 11; color: root.cAccent; Layout.fillWidth: true; elide: Text.ElideRight }
-            Text { text: "0.1.1 · simulated radio · not audited"; font.pixelSize: 10; color: root.cMuted }
+            Text { text: "0.1.2 · simulated radio · not audited"; font.pixelSize: 10; color: root.cMuted }
         }
     }
 

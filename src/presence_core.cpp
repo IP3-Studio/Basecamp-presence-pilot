@@ -440,37 +440,46 @@ SimDevice makeSimDevice(const std::string& name)
     uint8_t r[4];
     randomBytes(r, sizeof r);
     d.addrPhase = int64_t((uint32_t(r[0]) << 8 | r[1]) % 900);
-    d.advIntervalMs = 800 + int64_t(r[2]) * 2;  // 0.8 to 1.3 s, like a real stack's jittered interval
+    d.advBaseMs = 800 + int64_t(r[2]) * 2;  // 0.8 to 1.3 s, like a real stack's jittered interval
+    d.advIntervalMs = d.advBaseMs;
     return d;
 }
 
 std::vector<Observation> SimRoom::step(int64_t nowMs)
 {
+    // Address and slots are chosen per advertisement from that advertisement's
+    // own timestamp, never from the step's clock: a step that spans an epoch
+    // boundary would otherwise stamp pre-boundary adverts with the post-boundary
+    // address, which is a bridge the aligned policy must never produce.
     std::vector<Observation> out;
     const int64_t T = epochSeconds > 0 ? epochSeconds : 1;
     for (SimDevice& d : devices) {
-        const int64_t deviceNow = nowMs / 1000 + d.skewSeconds;
-        const int64_t epoch = epochOf(deviceNow, T);
-        int64_t key = 0;
-        switch (policy) {
-        case AddressPolicy::Aligned: key = epoch; break;
-        case AddressPolicy::Drifting: key = epochOf(deviceNow + d.addrPhase, d.addrPeriod > 0 ? d.addrPeriod : 900); break;
-        case AddressPolicy::Fixed: key = 0; break;
-        }
-        if (key != d.addrKey) {
-            d.addrKey = key;
-            randomBytes(d.addr.data(), d.addr.size());
-            d.addr[0] = uint8_t((d.addr[0] & 0x3f) | 0x40);  // resolvable-private-address shape
-        }
         if (d.nextAdvMs == 0)
             d.nextAdvMs = nowMs;
-        const std::vector<Slot16> slots = beaconSlots(d.seed, d.contacts, epoch);
         int emitted = 0;
         while (d.nextAdvMs <= nowMs && emitted < 64) {
+            const int64_t tAdv = d.nextAdvMs / 1000;
+            const int64_t deviceT = tAdv + d.skewSeconds;
+            const int64_t epoch = epochOf(deviceT, T);
+            int64_t key = 0;
+            switch (policy) {
+            case AddressPolicy::Aligned: key = epoch; break;
+            case AddressPolicy::Drifting: key = epochOf(deviceT + d.addrPhase, d.addrPeriod > 0 ? d.addrPeriod : 900); break;
+            case AddressPolicy::Fixed: key = 0; break;
+            }
+            if (key != d.addrKey) {
+                d.addrKey = key;
+                randomBytes(d.addr.data(), d.addr.size());
+                d.addr[0] = uint8_t((d.addr[0] & 0x3f) | 0x40);  // resolvable-private-address shape
+            }
+            if (epoch != d.slotsEpoch) {
+                d.slotsEpoch = epoch;
+                d.slotsCache = beaconSlots(d.seed, d.contacts, epoch);
+            }
             Observation o;
-            o.t = d.nextAdvMs / 1000;
+            o.t = tAdv;
             o.addr = d.addr;
-            o.slot = slots[size_t(d.slotIndex % kSlotsPerBeacon)];
+            o.slot = d.slotsCache[size_t(d.slotIndex % kSlotsPerBeacon)];
             o.viaNetwork = false;
             out.push_back(o);
             d.slotIndex = (d.slotIndex + 1) % kSlotsPerBeacon;

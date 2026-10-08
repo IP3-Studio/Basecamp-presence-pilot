@@ -155,6 +155,28 @@ int main()
         CHECK(devicesSince(all, 1000000) == 0);
     }
 
+    // Coarse steps (15 s, as a 60x clock produces) across epoch boundaries must
+    // not stamp a pre-boundary advert with the post-boundary address.
+    {
+        SimRoom room;
+        room.epochSeconds = 60;
+        room.policy = AddressPolicy::Aligned;
+        for (int i = 0; i < 4; ++i) { SimDevice d = makeSimDevice("c" + std::to_string(i)); d.advIntervalMs = 1000 + 137 * i; room.devices.push_back(d); }
+        std::vector<Observation> all;
+        for (int64_t ms = 0; ms <= 600 * 1000; ms += 15000) { auto o = room.step(ms); all.insert(all.end(), o.begin(), o.end()); }
+        const LinkReport r = analyse(all, 60);
+        CHECK(r.epochsCovered >= 10);
+        CHECK(r.addressesBridgingEpochs == 0);
+        CHECK(r.slotsBridgingAddresses == 0);
+        CHECK(r.longestTrailEpochs == 1);
+    }
+
+    // makeSimDevice records a base cadence separate from the scaled one.
+    {
+        SimDevice d = makeSimDevice("base");
+        CHECK(d.advBaseMs >= 800 && d.advBaseMs <= 1310 && d.advIntervalMs == d.advBaseMs);
+    }
+
     if (failures == 0)
         std::printf("core_test: all checks passed\n");
     else

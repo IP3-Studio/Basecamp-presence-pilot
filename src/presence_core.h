@@ -103,12 +103,15 @@ struct SimDevice {
     int64_t addrPeriod = 900;       // Drifting: seconds between address changes
     int64_t addrPhase = 0;          // Drifting: offset of the rotation clock
     int64_t skewSeconds = 0;        // clock skew relative to the room
-    int64_t advIntervalMs = 1000;   // one slot every interval
+    int64_t advIntervalMs = 1000;   // one slot every interval (base x clock speed)
+    int64_t advBaseMs = 1000;       // the jittered base interval, kept across rebuilds
     // runtime
     Addr6 addr{};
     int64_t addrKey = -1;           // identity of the current address interval
     int64_t nextAdvMs = 0;
     int slotIndex = 0;
+    int64_t slotsEpoch = -1;        // cache: the epoch slotsCache was computed for
+    std::vector<Slot16> slotsCache;
 };
 
 struct SimRoom {
