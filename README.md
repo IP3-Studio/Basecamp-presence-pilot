@@ -155,7 +155,11 @@ lgpm --modules-dir "$BASECAMP_DIR/modules" --ui-plugins-dir "$BASECAMP_DIR/plugi
 ```
 
 A running Basecamp only scans its plugins at startup: click **Modules →
-Reload** (or relaunch), then **Load** Presence. If Basecamp was launched with
+Reload** (or relaunch), then **Load** Presence. When upgrading from an
+earlier version, relaunch Basecamp rather than Unload and Load: the shell keeps
+the previous version's view plugin in memory, and a changed view contract then
+shows "Connecting to backend..." forever (`qt.remoteobjects: Signature
+mismatch` in the log). If Basecamp was launched with
 `--user-dir` (or `LOGOS_USER_DIR`), use that path as `BASECAMP_DIR`.
 
 Release assets are portable builds (self-contained, bundled support
